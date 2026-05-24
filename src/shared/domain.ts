@@ -189,3 +189,37 @@ export function summarizeProject(project: Project) {
 
 export const progressInputSchema = progressEventSchema.omit({ id: true, at: true });
 export type ProgressInput = z.infer<typeof progressInputSchema>;
+
+export const repositoryStatusSchema = z.object({
+  path: z.string(),
+  remote: z.string(),
+  branch: z.string(),
+  clean: z.boolean(),
+  changes: z.array(z.string())
+});
+export type RepositoryStatus = z.infer<typeof repositoryStatusSchema>;
+
+export const productRequirementSchema = z.object({
+  requirement: z.string().min(12, "Describe the product requirement in at least 12 characters")
+});
+export type ProductRequirement = z.infer<typeof productRequirementSchema>;
+
+export const deliveryStepSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  detail: z.string(),
+  status: z.enum(["done", "blocked", "pending"])
+});
+export type DeliveryStep = z.infer<typeof deliveryStepSchema>;
+
+export const deliverySessionSchema = z.object({
+  id: z.string(),
+  requirement: z.string(),
+  repository: repositoryStatusSchema,
+  branch: z.string(),
+  filesChanged: z.array(z.string()),
+  commit: z.string().nullable(),
+  steps: z.array(deliveryStepSchema),
+  createdAt: z.string()
+});
+export type DeliverySession = z.infer<typeof deliverySessionSchema>;

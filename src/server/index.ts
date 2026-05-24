@@ -1,9 +1,13 @@
 import cors from "cors";
 import express from "express";
-import { progressInputSchema, summarizeProject } from "../shared/domain";
+import { productRequirementSchema, progressInputSchema, summarizeProject } from "../shared/domain";
+import { GitDeliveryService } from "./gitDelivery";
 import { ProjectStore } from "./store";
 
-export function createApp(store = new ProjectStore()) {
+export function createApp(
+  store = new ProjectStore(),
+  deliveryService = new GitDeliveryService()
+) {
   const app = express();
 
   app.use(cors());
@@ -16,6 +20,40 @@ export function createApp(store = new ProjectStore()) {
   app.get("/api/project", (_request, response) => {
     const project = store.read();
     response.json({ project, summary: summarizeProject(project) });
+  });
+
+  app.get("/api/repository", async (_request, response) => {
+    try {
+      response.json({ repository: await deliveryService.status() });
+    } catch (cause) {
+      response.status(500).json({
+        error: cause instanceof Error ? cause.message : "Unable to read repository status"
+      });
+    }
+  });
+
+  app.post("/api/deliveries", async (request, response) => {
+    const parsed = productRequirementSchema.safeParse(request.body);
+
+    if (!parsed.success) {
+      response.status(400).json({ error: "Invalid product requirement", details: parsed.error.flatten() });
+      return;
+    }
+
+    try {
+      const session = await deliveryService.createDelivery(parsed.data);
+      store.appendProgress({
+        actor: "delivery-agent",
+        summary: `Started delivery session ${session.id}`,
+        decision: `Created ${session.branch} and committed ${session.filesChanged.join(", ")}.`,
+        next: "Implement the vertical slice, run verification, and push the delivery branch."
+      });
+      response.status(201).json({ session });
+    } catch (cause) {
+      response.status(409).json({
+        error: cause instanceof Error ? cause.message : "Unable to create delivery session"
+      });
+    }
   });
 
   app.post("/api/progress", (request, response) => {
